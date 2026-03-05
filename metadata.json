@@ -1,0 +1,5 @@
+{
+  "name": "CloudVault - Modern File Management",
+  "description": "A glassmorphism-styled cloud file management platform with secure Supabase integration.",
+  "requestFramePermissions": []
+}
