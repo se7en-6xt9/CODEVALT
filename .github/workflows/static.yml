@@ -18,15 +18,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Clear npm cache
         run: npm cache clean --force
 
-      - name: Install dependencies
-        run: npm install --no-optional
+      - name: Remove node_modules and package-lock
+        run: rm -rf node_modules package-lock.json
 
-      - run: npm run build
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
         with:
