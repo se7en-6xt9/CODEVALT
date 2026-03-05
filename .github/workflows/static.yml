@@ -20,7 +20,12 @@ jobs:
         with:
           node-version: 18
 
-      - run: npm install
+      - name: Clear npm cache
+        run: npm cache clean --force
+
+      - name: Install dependencies
+        run: npm install --no-optional
+
       - run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
