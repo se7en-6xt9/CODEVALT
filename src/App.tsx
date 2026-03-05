@@ -460,6 +460,172 @@ const AuthForm = ({ mode, onToggle, onSuccess, initialEmail = '' }: {
   );
 };
 
+// --- Explorer Item Component ---
+
+const ExplorerItem = React.memo(({ 
+  item, 
+  depth = 0, 
+  expandedFolders, 
+  childrenMap, 
+  activeFolderId, 
+  selectedFile, 
+  clipboard, 
+  isRenaming, 
+  newName,
+  onToggleFolder,
+  onSelectFile,
+  onContextMenu,
+  onRename,
+  onNewNameChange,
+  onMoveItem,
+  onCopyItem,
+  files // needed for copy logic
+}: {
+  item: FileMetadata;
+  depth?: number;
+  expandedFolders: Set<string>;
+  childrenMap: Record<string, FileMetadata[]>;
+  activeFolderId: string | null;
+  selectedFile: FileMetadata | null;
+  clipboard: { item: FileMetadata, type: 'copy' | 'cut' } | null;
+  isRenaming: string | null;
+  newName: string;
+  onToggleFolder: (id: string) => void;
+  onSelectFile: (item: FileMetadata) => void;
+  onContextMenu: (e: React.MouseEvent, item: FileMetadata) => void;
+  onRename: (item: FileMetadata) => void;
+  onNewNameChange: (name: string) => void;
+  onMoveItem: (itemId: string, targetId: string | null) => void;
+  onCopyItem: (item: FileMetadata, targetId: string | null) => void;
+  files: FileMetadata[];
+}) => {
+  const isExpanded = expandedFolders.has(item.id);
+  const children = childrenMap[item.id] || [];
+  const isActive = activeFolderId === item.id;
+
+  return (
+    <div 
+      className="select-none"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('itemId', item.id);
+        e.dataTransfer.effectAllowed = 'copyMove';
+      }}
+      onDragOver={(e) => {
+        if (item.is_folder) {
+          e.preventDefault();
+          e.currentTarget.classList.add('bg-emerald-500/10');
+        }
+      }}
+      onDragLeave={(e) => {
+        e.currentTarget.classList.remove('bg-emerald-500/10');
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.currentTarget.classList.remove('bg-emerald-500/10');
+        const draggedId = e.dataTransfer.getData('itemId');
+        if (item.is_folder && draggedId !== item.id) {
+          if (e.ctrlKey || e.metaKey) {
+            const draggedItem = files.find(f => f.id === draggedId);
+            if (draggedItem) onCopyItem(draggedItem, item.id);
+          } else {
+            onMoveItem(draggedId, item.id);
+          }
+        }
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onContextMenu(e, item);
+      }}
+    >
+      <div 
+        className={cn(
+          "group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200",
+          selectedFile?.id === item.id || (item.is_folder && isActive) ? "bg-emerald-500/20 text-emerald-400 shadow-lg shadow-emerald-500/5" : "hover:bg-white/5 text-white/70",
+          clipboard?.item.id === item.id && clipboard.type === 'cut' && "opacity-40 grayscale"
+        )}
+        style={{ paddingLeft: `${depth * 1.5 + 1}rem` }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (item.is_folder) {
+            onToggleFolder(item.id);
+          } else {
+            onSelectFile(item);
+          }
+        }}
+      >
+        {item.is_folder ? (
+          isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
+        ) : (
+          <FileText className="w-4 h-4" />
+        )}
+        
+        {item.is_folder && <Folder className={cn("w-4 h-4", isActive ? "text-emerald-400" : "text-blue-400")} />}
+        
+        {isRenaming === item.id ? (
+          <input 
+            autoFocus
+            className="bg-white/10 border-none rounded px-1 py-0 text-xs text-white focus:outline-none w-full"
+            value={newName}
+            onChange={(e) => onNewNameChange(e.target.value)}
+            onBlur={() => onRename(item)}
+            onKeyDown={(e) => e.key === 'Enter' && onRename(item)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className="text-xs truncate flex-1">{item.name}</span>
+        )}
+
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            onContextMenu(e, item);
+          }}
+          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+          title="Menu"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
+      </div>
+
+      {item.is_folder && isExpanded && (
+        <div className="mt-0.5">
+          {children.map(child => (
+            <ExplorerItem 
+              key={child.id}
+              item={child}
+              depth={depth + 1}
+              expandedFolders={expandedFolders}
+              childrenMap={childrenMap}
+              activeFolderId={activeFolderId}
+              selectedFile={selectedFile}
+              clipboard={clipboard}
+              isRenaming={isRenaming}
+              newName={newName}
+              onToggleFolder={onToggleFolder}
+              onSelectFile={onSelectFile}
+              onContextMenu={onContextMenu}
+              onRename={onRename}
+              onNewNameChange={onNewNameChange}
+              onMoveItem={onMoveItem}
+              onCopyItem={onCopyItem}
+              files={files}
+            />
+          ))}
+          {children.length === 0 && (
+            <div 
+              className="text-[10px] text-white/20 italic py-1"
+              style={{ paddingLeft: `${(depth + 1) * 1.2 + 2}rem` }}
+            >
+              Empty folder
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
 const Dashboard = ({ user }: { user: any }) => {
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [loading, setLoading] = useState(true);
@@ -481,7 +647,17 @@ const Dashboard = ({ user }: { user: any }) => {
   const [clipboard, setClipboard] = useState<{ item: FileMetadata, type: 'copy' | 'cut' } | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, item: FileMetadata | null } | null>(null);
-  const longPressTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Pre-calculate children map for performance
+  const childrenMap = React.useMemo(() => {
+    const map: Record<string, FileMetadata[]> = {};
+    files.forEach(file => {
+      const pid = file.parent_id || 'root';
+      if (!map[pid]) map[pid] = [];
+      map[pid].push(file);
+    });
+    return map;
+  }, [files]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -791,7 +967,11 @@ const Dashboard = ({ user }: { user: any }) => {
     }
   };
 
-  const saveFileContent = async () => {
+  const handleEditorChange = React.useCallback((val: string | undefined) => {
+    setEditorContent(val || '');
+  }, []);
+
+  const handleSaveFile = React.useCallback(async () => {
     if (!selectedFile) return;
 
     try {
@@ -803,152 +983,44 @@ const Dashboard = ({ user }: { user: any }) => {
       if (error) throw error;
       
       // Update local state
-      setFiles(files.map(f => f.id === selectedFile.id ? { ...f, content: editorContent } : f));
+      setFiles(prev => prev.map(f => f.id === selectedFile.id ? { ...f, content: editorContent } : f));
       showToast('File saved!', 'success');
     } catch (err: any) {
       console.error('Save error:', err);
       showToast('Save failed: ' + err.message, 'error');
     }
-  };
+  }, [selectedFile, editorContent]);
 
-  const toggleFolder = (id: string) => {
-    const newExpanded = new Set(expandedFolders);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedFolders(newExpanded);
-    setActiveFolderId(id);
-  };
-
-  const renderExplorerItem = (item: FileMetadata, depth = 0) => {
-    const isExpanded = expandedFolders.has(item.id);
-    const children = files.filter(f => f.parent_id === item.id);
-    const isActive = activeFolderId === item.id;
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-      longPressTimer.current = setTimeout(() => {
-        const touch = e.touches[0];
-        setContextMenu({ x: touch.clientX, y: touch.clientY, item });
-      }, 600);
-    };
-
-    const handleTouchEnd = () => {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
+  const toggleFolder = React.useCallback((id: string) => {
+    setExpandedFolders(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(id)) {
+        newExpanded.delete(id);
+      } else {
+        newExpanded.add(id);
       }
-    };
+      return newExpanded;
+    });
+    setActiveFolderId(id);
+  }, []);
 
-    return (
-      <div 
-        key={item.id} 
-        className="select-none"
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData('itemId', item.id);
-          e.dataTransfer.effectAllowed = 'copyMove';
-        }}
-        onDragOver={(e) => {
-          if (item.is_folder) {
-            e.preventDefault();
-            e.currentTarget.classList.add('bg-emerald-500/10');
-          }
-        }}
-        onDragLeave={(e) => {
-          e.currentTarget.classList.remove('bg-emerald-500/10');
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.currentTarget.classList.remove('bg-emerald-500/10');
-          const draggedId = e.dataTransfer.getData('itemId');
-          if (item.is_folder && draggedId !== item.id) {
-            if (e.ctrlKey || e.metaKey) {
-              const draggedItem = files.find(f => f.id === draggedId);
-              if (draggedItem) handleCopyItem(draggedItem, item.id);
-            } else {
-              handleMoveItem(draggedId, item.id);
-            }
-          }
-        }}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setContextMenu({ x: e.clientX, y: e.clientY, item });
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchMove={handleTouchEnd}
-      >
-        <div 
-          className={cn(
-            "group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200",
-            selectedFile?.id === item.id || (item.is_folder && isActive) ? "bg-emerald-500/20 text-emerald-400 shadow-lg shadow-emerald-500/5" : "hover:bg-white/5 text-white/70",
-            clipboard?.item.id === item.id && clipboard.type === 'cut' && "opacity-40 grayscale"
-          )}
-          style={{ paddingLeft: `${depth * 1.5 + 1}rem` }}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (item.is_folder) {
-              toggleFolder(item.id);
-            } else {
-              setSelectedFile(item);
-              setEditorContent(item.content || '');
-              setActiveFolderId(item.parent_id);
-            }
-          }}
-        >
-          {item.is_folder ? (
-            isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
-          ) : (
-            <FileText className="w-4 h-4" />
-          )}
-          
-          {item.is_folder && <Folder className={cn("w-4 h-4", isActive ? "text-emerald-400" : "text-blue-400")} />}
-          
-          {isRenaming === item.id ? (
-            <input 
-              autoFocus
-              className="bg-white/10 border-none rounded px-1 py-0 text-xs text-white focus:outline-none w-full"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onBlur={() => renameItem(item)}
-              onKeyDown={(e) => e.key === 'Enter' && renameItem(item)}
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span className="text-xs truncate flex-1">{item.name}</span>
-          )}
+  const handleSelectFile = React.useCallback((item: FileMetadata) => {
+    setSelectedFile(item);
+    setEditorContent(item.content || '');
+    setActiveFolderId(item.parent_id);
+  }, []);
 
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setContextMenu({ x: e.clientX, y: e.clientY, item });
-            }}
-            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
-            title="Menu"
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
-        </div>
+  const handleContextMenu = React.useCallback((e: React.MouseEvent, item: FileMetadata | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
+  }, []);
 
-        {item.is_folder && isExpanded && (
-          <div className="mt-0.5">
-            {children.map(child => renderExplorerItem(child, depth + 1))}
-            {children.length === 0 && (
-              <div 
-                className="text-[10px] text-white/20 italic py-1"
-                style={{ paddingLeft: `${(depth + 1) * 1.2 + 2}rem` }}
-              >
-                Empty folder
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const handleRenameSubmit = React.useCallback((item: FileMetadata) => {
+    renameItem(item);
+  }, [newName, renameItem]);
 
-  const rootItems = files.filter(f => f.parent_id === null);
+  const rootItems = childrenMap['root'] || [];
 
   useEffect(() => {
     const handleMove = (clientX: number) => {
@@ -981,6 +1053,30 @@ const Dashboard = ({ user }: { user: any }) => {
     };
   }, [isResizing]);
 
+  // Memoized Empty Workspace View
+  const emptyWorkspace = React.useMemo(() => (
+    <div className="flex-1 flex flex-col items-center justify-center text-center p-10 select-none">
+      <div className="w-24 h-24 bg-white/5 rounded-[2.5rem] flex items-center justify-center mb-8 border border-white/5 shadow-2xl">
+        <Cloud className="w-10 h-10 text-emerald-500/40" />
+      </div>
+      <h2 className="text-2xl font-black text-white/80 mb-3 tracking-tight">CloudVault Explorer</h2>
+      <p className="text-white/30 max-w-xs text-sm font-medium leading-relaxed">
+        Select a file to start editing or create a new one to begin your project.
+      </p>
+      {!isSidebarVisible && (
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsSidebarVisible(true);
+          }}
+          className="mt-8 px-8 py-3 bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-full shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95 transition-all"
+        >
+          Open Explorer
+        </button>
+      )}
+    </div>
+  ), [isSidebarVisible]);
+
   return (
     <div className="pt-24 h-screen flex flex-col overflow-hidden" onClick={() => {
       setActiveFolderId(null);
@@ -1001,15 +1097,12 @@ const Dashboard = ({ user }: { user: any }) => {
         )}
 
         {/* Sidebar / Explorer */}
-        <motion.div 
-          initial={false}
-          animate={{ 
-            width: isSidebarVisible ? sidebarWidth : 0,
-            opacity: isSidebarVisible ? 1 : 0,
-            x: isSidebarVisible ? 0 : -20
-          }}
-          transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="glass-dark border-r border-white/5 flex flex-col relative group/sidebar overflow-hidden"
+        <div 
+          className={cn(
+            "glass-dark border-r border-white/5 flex flex-col relative group/sidebar overflow-hidden will-change-[width,opacity] transition-[width,opacity] duration-75 ease-out",
+            !isSidebarVisible && "w-0 opacity-0"
+          )}
+          style={{ width: isSidebarVisible ? sidebarWidth : 0 }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Resize Handle */}
@@ -1090,7 +1183,27 @@ const Dashboard = ({ user }: { user: any }) => {
                 ))}
               </div>
             ) : rootItems.length > 0 ? (
-              rootItems.map(item => renderExplorerItem(item))
+              rootItems.map(item => (
+                <ExplorerItem 
+                  key={item.id}
+                  item={item}
+                  expandedFolders={expandedFolders}
+                  childrenMap={childrenMap}
+                  activeFolderId={activeFolderId}
+                  selectedFile={selectedFile}
+                  clipboard={clipboard}
+                  isRenaming={isRenaming}
+                  newName={newName}
+                  onToggleFolder={toggleFolder}
+                  onSelectFile={handleSelectFile}
+                  onContextMenu={handleContextMenu}
+                  onRename={handleRenameSubmit}
+                  onNewNameChange={setNewName}
+                  onMoveItem={handleMoveItem}
+                  onCopyItem={handleCopyItem}
+                  files={files}
+                />
+              ))
             ) : (
               <div className="text-center py-10 px-4">
                 <p className="text-xs text-white/20">No files or folders yet.</p>
@@ -1106,7 +1219,7 @@ const Dashboard = ({ user }: { user: any }) => {
               </div>
             )}
           </div>
-        </motion.div>
+        </div>
 
         {/* Editor Workspace */}
         <div className="flex-1 bg-black/40 flex flex-col relative">
@@ -1115,28 +1228,12 @@ const Dashboard = ({ user }: { user: any }) => {
               <CodeEditor 
                 filename={selectedFile.name}
                 content={editorContent}
-                onChange={(val) => setEditorContent(val || '')}
-                onSave={saveFileContent}
+                onChange={handleEditorChange}
+                onSave={handleSaveFile}
               />
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
-              <div className="w-24 h-24 bg-white/5 rounded-[2.5rem] flex items-center justify-center mb-8 border border-white/5 shadow-2xl">
-                <Cloud className="w-10 h-10 text-emerald-500/40" />
-              </div>
-              <h2 className="text-2xl font-black text-white/80 mb-3 tracking-tight">CloudVault Explorer</h2>
-              <p className="text-white/30 max-w-xs text-sm font-medium leading-relaxed">
-                Select a file to start editing or create a new one to begin your project.
-              </p>
-              {!isSidebarVisible && (
-                <button 
-                  onClick={() => setIsSidebarVisible(true)}
-                  className="mt-8 px-8 py-3 bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-full shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:scale-105 active:scale-95 transition-all"
-                >
-                  Open Explorer
-                </button>
-              )}
-            </div>
+            emptyWorkspace
           )}
         </div>
       </div>
@@ -1148,8 +1245,12 @@ const Dashboard = ({ user }: { user: any }) => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed z-[300] glass-dark border border-white/10 rounded-2xl shadow-2xl py-2 min-w-[180px] overflow-hidden backdrop-blur-2xl"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+            className="fixed z-[300] glass-dark border border-white/10 rounded-2xl shadow-2xl py-2 min-w-[200px] max-h-[80vh] overflow-y-auto backdrop-blur-2xl custom-scrollbar"
+            style={{ 
+              left: contextMenu.x, 
+              top: contextMenu.y,
+              transform: `translate(${contextMenu.x + 240 > window.innerWidth ? '-100%' : '0'}, ${contextMenu.y > window.innerHeight - 380 ? '-100%' : '0'})`
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {contextMenu.item ? (
@@ -1181,10 +1282,10 @@ const Dashboard = ({ user }: { user: any }) => {
                   <Copy className="w-4 h-4 text-white/40" />
                   <span>Copy</span>
                 </button>
-                {clipboard && (
+                {clipboard && contextMenu.item.is_folder && (
                   <button 
                     onClick={() => {
-                      handlePaste(contextMenu.item!.is_folder ? contextMenu.item!.id : contextMenu.item!.parent_id);
+                      handlePaste(contextMenu.item!.id);
                       setContextMenu(null);
                     }}
                     className="w-full px-4 py-2.5 text-left text-sm hover:bg-emerald-500/10 text-emerald-400 flex items-center gap-3 transition-colors"

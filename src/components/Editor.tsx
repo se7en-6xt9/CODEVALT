@@ -33,7 +33,7 @@ const getLanguage = (filename: string) => {
   }
 };
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ content, filename, onChange, onSave }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = React.memo(({ content, filename, onChange, onSave }) => {
   return (
     <div className="h-full w-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/10">
@@ -64,4 +64,4 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ content, filename, onCha
       </div>
     </div>
   );
-};
+});
