@@ -6,7 +6,7 @@
   "homepage": "https://se7en-6xt9.github.io/CODEVALT/",
   "scripts": {
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist",
+    "deploy": "gh-pages -d builf",
     
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
