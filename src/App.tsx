@@ -778,11 +778,16 @@ const Dashboard = ({ user }: { user: any }) => {
     const { item, type } = clipboard;
     const targetFolderId = targetId !== undefined ? targetId : activeFolderId;
 
-    if (type === 'cut') {
-      await handleMoveItem(item.id, targetFolderId);
+    try {
+      if (type === 'cut') {
+        await handleMoveItem(item.id, targetFolderId);
+      } else {
+        await handleCopyItem(item, targetFolderId);
+      }
+      // Automatically clear the clipboard and hide the "Paste" option
       setClipboard(null);
-    } else {
-      await handleCopyItem(item, targetFolderId);
+    } catch (err) {
+      console.error('Paste error:', err);
     }
   };
 
@@ -881,7 +886,8 @@ const Dashboard = ({ user }: { user: any }) => {
             clipboard?.item.id === item.id && clipboard.type === 'cut' && "opacity-40 grayscale"
           )}
           style={{ paddingLeft: `${depth * 1.5 + 1}rem` }}
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             if (item.is_folder) {
               toggleFolder(item.id);
             } else {
@@ -913,69 +919,16 @@ const Dashboard = ({ user }: { user: any }) => {
             <span className="text-xs truncate flex-1">{item.name}</span>
           )}
 
-          <div className="hidden group-hover:flex items-center gap-1.5">
-            {item.is_folder && clipboard && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePaste(item.id);
-                }}
-                className="p-1.5 hover:bg-emerald-500/20 rounded transition-colors text-emerald-400"
-                title="Paste into this folder"
-              >
-                <ClipboardPaste className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setClipboard({ item, type: 'cut' });
-                showToast(`"${item.name}" cut to clipboard`, 'info');
-              }}
-              className={cn(
-                "p-1.5 hover:bg-white/10 rounded transition-colors",
-                clipboard?.item.id === item.id && clipboard.type === 'cut' ? "text-emerald-400" : "text-white/40"
-              )}
-              title="Cut"
-            >
-              <Scissors className="w-3.5 h-3.5" />
-            </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setClipboard({ item, type: 'copy' });
-                showToast(`"${item.name}" copied to clipboard`, 'info');
-              }}
-              className={cn(
-                "p-1.5 hover:bg-white/10 rounded transition-colors",
-                clipboard?.item.id === item.id && clipboard.type === 'copy' ? "text-emerald-400" : "text-white/40"
-              )}
-              title="Copy"
-            >
-              <Copy className="w-3.5 h-3.5" />
-            </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsRenaming(item.id);
-                setNewName(item.name);
-              }}
-              className="p-1.5 hover:bg-white/10 rounded transition-colors text-white/40"
-              title="Rename"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDeleteModal(item);
-              }}
-              className="p-1.5 hover:bg-red-500/10 rounded text-red-400 transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setContextMenu({ x: e.clientX, y: e.clientY, item });
+            }}
+            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+            title="Menu"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
         </div>
 
         {item.is_folder && isExpanded && (
@@ -998,26 +951,33 @@ const Dashboard = ({ user }: { user: any }) => {
   const rootItems = files.filter(f => f.parent_id === null);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (clientX: number) => {
       if (!isResizing) return;
       window.requestAnimationFrame(() => {
-        const newWidth = Math.max(200, Math.min(600, e.clientX));
+        const newWidth = Math.max(200, Math.min(600, clientX));
         setSidebarWidth(newWidth);
       });
     };
 
-    const handleMouseUp = () => {
+    const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX);
+    const handleTouchMove = (e: TouchEvent) => handleMove(e.touches[0].clientX);
+
+    const handleEnd = () => {
       setIsResizing(false);
     };
 
     if (isResizing) {
       window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseup', handleEnd);
+      window.addEventListener('touchmove', handleTouchMove);
+      window.addEventListener('touchend', handleEnd);
     }
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
     };
   }, [isResizing]);
 
@@ -1026,14 +986,17 @@ const Dashboard = ({ user }: { user: any }) => {
       setActiveFolderId(null);
       setContextMenu(null);
     }}>
-      <div className="flex-1 flex overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="flex-1 flex overflow-hidden">
         {/* Sidebar Toggle Button (Floating when hidden) */}
         {!isSidebarVisible && (
           <button 
-            onClick={() => setIsSidebarVisible(true)}
-            className="fixed top-24 left-6 z-[60] p-3 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/20 hover:scale-110 transition-all duration-300"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsSidebarVisible(true);
+            }}
+            className="fixed top-28 left-6 z-[60] p-4 bg-emerald-500 rounded-2xl shadow-2xl shadow-emerald-500/40 hover:scale-110 active:scale-90 transition-all duration-300 border border-emerald-400/20"
           >
-            <Menu className="w-5 h-5 text-white" />
+            <Menu className="w-6 h-6 text-white" />
           </button>
         )}
 
@@ -1047,16 +1010,20 @@ const Dashboard = ({ user }: { user: any }) => {
           }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
           className="glass-dark border-r border-white/5 flex flex-col relative group/sidebar overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Resize Handle */}
           {isSidebarVisible && (
             <div 
               className={cn(
-                "absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-emerald-500/50 transition-colors z-50",
-                isResizing && "bg-emerald-500 w-0.5"
+                "absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-emerald-500/50 transition-colors z-50",
+                isResizing && "bg-emerald-500 w-1"
               )}
               onMouseDown={(e) => {
                 e.preventDefault();
+                setIsResizing(true);
+              }}
+              onTouchStart={(e) => {
                 setIsResizing(true);
               }}
             />
@@ -1071,13 +1038,21 @@ const Dashboard = ({ user }: { user: any }) => {
               >
                 <Menu className="w-6 h-6" />
               </button>
-              <div className="flex flex-col">
-                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white/30">Explorer</h2>
-                {activeFolderId && (
-                  <span className="text-[10px] text-emerald-500/60 truncate max-w-[80px] font-bold uppercase tracking-tighter">
-                    {files.find(f => f.id === activeFolderId)?.name}
-                  </span>
-                )}
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => setShowCreateModal({ type: 'file' })}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition-all text-emerald-400 border border-emerald-500/20"
+                >
+                  <FilePlus className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-wider">File</span>
+                </button>
+                <button 
+                  onClick={() => setShowCreateModal({ type: 'folder' })}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-all text-blue-400 border border-blue-500/20"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span className="text-[10px] font-black uppercase tracking-wider">Folder</span>
+                </button>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1088,25 +1063,15 @@ const Dashboard = ({ user }: { user: any }) => {
               >
                 <ArrowRight className="w-6 h-6 rotate-180" />
               </button>
-              <button 
-                onClick={() => setShowCreateModal({ type: 'file' })}
-                className="p-3.5 hover:bg-white/10 rounded-2xl transition-all text-white/40 hover:text-white hover:scale-110 active:scale-95"
-                title="New File"
-              >
-                <FilePlus className="w-6 h-6" />
-              </button>
-              <button 
-                onClick={() => setShowCreateModal({ type: 'folder' })}
-                className="p-3.5 hover:bg-white/10 rounded-2xl transition-all text-white/40 hover:text-white hover:scale-110 active:scale-95"
-                title="New Folder"
-              >
-                <FolderPlus className="w-6 h-6" />
-              </button>
             </div>
           </div>
 
           <div 
             className="flex-1 overflow-y-auto p-2 custom-scrollbar"
+            onClick={() => {
+              setActiveFolderId(null);
+              setContextMenu(null);
+            }}
             onDragOver={(e) => {
               e.preventDefault();
             }}
@@ -1145,16 +1110,6 @@ const Dashboard = ({ user }: { user: any }) => {
 
         {/* Editor Workspace */}
         <div className="flex-1 bg-black/40 flex flex-col relative">
-          {/* Sidebar Toggle Button (Floating when hidden) */}
-          {!isSidebarVisible && (
-            <button 
-              onClick={() => setIsSidebarVisible(true)}
-              className="absolute top-4 left-4 z-40 p-3 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/20 hover:scale-110 transition-all duration-300"
-            >
-              <Menu className="w-5 h-5 text-white" />
-            </button>
-          )}
-
           {selectedFile ? (
             <div className="flex-1 flex flex-col pt-16">
               <CodeEditor 
@@ -1199,8 +1154,8 @@ const Dashboard = ({ user }: { user: any }) => {
           >
             {contextMenu.item ? (
               <>
-                <div className="px-4 py-2 border-b border-white/5 mb-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/30 truncate">
+                <div className="px-4 py-2 border-b border-white/5 mb-1 bg-white/5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 truncate">
                     {contextMenu.item.name}
                   </p>
                 </div>
@@ -1213,7 +1168,7 @@ const Dashboard = ({ user }: { user: any }) => {
                   className="w-full px-4 py-2.5 text-left text-sm hover:bg-white/10 flex items-center gap-3 transition-colors"
                 >
                   <Scissors className="w-4 h-4 text-white/40" />
-                  <span>Cut / Move</span>
+                  <span>Cut</span>
                 </button>
                 <button 
                   onClick={() => {
@@ -1226,18 +1181,29 @@ const Dashboard = ({ user }: { user: any }) => {
                   <Copy className="w-4 h-4 text-white/40" />
                   <span>Copy</span>
                 </button>
-                {contextMenu.item.is_folder && clipboard && (
+                {clipboard && (
                   <button 
                     onClick={() => {
-                      handlePaste(contextMenu.item!.id);
+                      handlePaste(contextMenu.item!.is_folder ? contextMenu.item!.id : contextMenu.item!.parent_id);
                       setContextMenu(null);
                     }}
                     className="w-full px-4 py-2.5 text-left text-sm hover:bg-emerald-500/10 text-emerald-400 flex items-center gap-3 transition-colors"
                   >
                     <ClipboardPaste className="w-4 h-4" />
-                    <span>Paste Here</span>
+                    <span>Paste</span>
                   </button>
                 )}
+                <button 
+                  onClick={() => {
+                    setClipboard({ item: contextMenu.item!, type: 'cut' });
+                    showToast(`Select destination to move "${contextMenu.item!.name}"`, 'info');
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-white/10 flex items-center gap-3 transition-colors"
+                >
+                  <ArrowRight className="w-4 h-4 text-white/40" />
+                  <span>Move</span>
+                </button>
                 <button 
                   onClick={() => {
                     setIsRenaming(contextMenu.item!.id);
@@ -1260,9 +1226,22 @@ const Dashboard = ({ user }: { user: any }) => {
                   <Trash2 className="w-4 h-4" />
                   <span>Delete</span>
                 </button>
+                <div className="h-px bg-white/5 my-1" />
+                <button 
+                  onClick={() => setContextMenu(null)}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-white/10 text-white/40 flex items-center gap-3 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Cancel</span>
+                </button>
               </>
             ) : (
               <>
+                <div className="px-4 py-2 border-b border-white/5 mb-1 bg-white/5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/30 truncate">
+                    Workspace Actions
+                  </p>
+                </div>
                 <button 
                   onClick={() => {
                     setShowCreateModal({ type: 'file' });
@@ -1292,9 +1271,17 @@ const Dashboard = ({ user }: { user: any }) => {
                     className="w-full px-4 py-2.5 text-left text-sm hover:bg-emerald-500/10 text-emerald-400 flex items-center gap-3 transition-colors"
                   >
                     <ClipboardPaste className="w-4 h-4" />
-                    <span>Paste to Root</span>
+                    <span>Paste</span>
                   </button>
                 )}
+                <div className="h-px bg-white/5 my-1" />
+                <button 
+                  onClick={() => setContextMenu(null)}
+                  className="w-full px-4 py-2.5 text-left text-sm hover:bg-white/10 text-white/40 flex items-center gap-3 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Cancel</span>
+                </button>
               </>
             )}
           </motion.div>
