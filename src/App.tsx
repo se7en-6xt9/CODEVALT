@@ -675,7 +675,14 @@ const Dashboard = ({ user }: { user: any }) => {
       
       if (error) {
         console.error('Supabase fetch error:', error);
-        throw error;
+        if (error.code === 'PGRST116') {
+          showToast('Database Error: Table "files" not found. Please run the SQL setup script in your Supabase dashboard.', 'error');
+        } else if (error.message?.includes('JWT')) {
+          showToast('Authentication Error: Invalid Supabase Anon Key.', 'error');
+        } else {
+          throw error;
+        }
+        return;
       }
       console.log('Files fetched:', data?.length || 0);
       setFiles(data || []);
