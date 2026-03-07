@@ -675,14 +675,7 @@ const Dashboard = ({ user }: { user: any }) => {
       
       if (error) {
         console.error('Supabase fetch error:', error);
-        if (error.code === 'PGRST116') {
-          showToast('Database Error: Table "files" not found. Please run the SQL setup script in your Supabase dashboard.', 'error');
-        } else if (error.message?.includes('JWT')) {
-          showToast('Authentication Error: Invalid Supabase Anon Key.', 'error');
-        } else {
-          throw error;
-        }
-        return;
+        throw error;
       }
       console.log('Files fetched:', data?.length || 0);
       setFiles(data || []);
@@ -1571,20 +1564,53 @@ export default function App() {
           )}
 
           {page === 'about' && (
-            <motion.div key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-40 px-6 max-w-3xl mx-auto text-center">
-              <h1 className="text-4xl font-bold mb-8">About CloudVault</h1>
-              <p className="text-white/60 leading-relaxed mb-6">
-                CloudVault was founded in 2026 with a simple mission: to make cloud storage beautiful and accessible. 
-                We believe that the tools you use every day should inspire you.
-              </p>
-              <div className="grid grid-cols-2 gap-6 mt-12">
-                <div className="glass p-8 rounded-3xl">
-                  <h3 className="text-3xl font-bold text-emerald-400 mb-2">10M+</h3>
-                  <p className="text-xs text-white/40 uppercase tracking-widest">Files Stored</p>
-                </div>
-                <div className="glass p-8 rounded-3xl">
-                  <h3 className="text-3xl font-bold text-blue-400 mb-2">99.9%</h3>
-                  <p className="text-xs text-white/40 uppercase tracking-widest">Uptime</p>
+            <motion.div key="about" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-40 pb-20 px-6 max-w-4xl mx-auto">
+              <div className="glass p-10 md:p-16 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] -z-10" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 blur-[100px] -z-10" />
+                
+                <h1 className="text-4xl md:text-5xl font-black mb-8 tracking-tight text-center">About Us</h1>
+                
+                <div className="space-y-8 text-left">
+                  <section>
+                    <h2 className="text-xl font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      The Developers
+                    </h2>
+                    <p className="text-white/70 leading-relaxed text-lg">
+                      This platform is developed and maintained by <span className="text-white font-bold">Madhusudan Rajput</span> and <span className="text-white font-bold">Gaurav Kumar</span>. 
+                      We are dedicated students at <span className="text-emerald-400 font-semibold">Shri Mata Vaishno Devi University (SMVDU)</span>, passionate about building modern web solutions.
+                    </p>
+                  </section>
+
+                  <section>
+                    <h2 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                      <Zap className="w-5 h-5" />
+                      Our Vision
+                    </h2>
+                    <p className="text-white/70 leading-relaxed">
+                      This project represents our commitment to excellence in development. It was built through our own dedicated development efforts, complemented by the strategic support of advanced AI tools to ensure the highest quality and performance.
+                    </p>
+                    <p className="text-white/70 leading-relaxed mt-4">
+                      The website is fully functional, offering a secure environment where users can create accounts, manage their files, and explore all the features we've implemented.
+                    </p>
+                  </section>
+
+                  <div className="h-px bg-white/10 my-10" />
+
+                  <section>
+                    <h2 className="text-xl font-bold text-white mb-6">Contact Information</h2>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="glass-card p-6 rounded-2xl border border-white/5">
+                        <h3 className="font-bold text-emerald-400 mb-1">Madhusudan Rajput</h3>
+                        <p className="text-sm text-white/50">Email: 25bcs@smvdu.ac.in</p>
+                      </div>
+                      <div className="glass-card p-6 rounded-2xl border border-white/5">
+                        <h3 className="font-bold text-blue-400 mb-1">Gaurav Kumar</h3>
+                        <p className="text-sm text-white/50">Registration No: 25BCS037</p>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </div>
             </motion.div>
